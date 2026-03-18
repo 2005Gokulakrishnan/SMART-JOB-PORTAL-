@@ -1,9 +1,10 @@
 import streamlit as st
+import PyPDF2
 
 st.set_page_config(page_title="SmartHire AI", layout="wide")
 
 # -------------------------------
-# DOMAIN SKILLS (from your HTML)
+# DOMAIN SKILLS
 # -------------------------------
 DOMAIN_SKILLS = {
     "software": ["python","java","react","node","django","flask","sql","mongodb","aws","docker","html","css","javascript"],
@@ -41,9 +42,20 @@ jobs = [
 ]
 
 # -------------------------------
-# FUNCTIONS
+# PDF FUNCTION
 # -------------------------------
+def extract_text_from_pdf(uploaded_file):
+    text = ""
+    pdf_reader = PyPDF2.PdfReader(uploaded_file)
 
+    for page in pdf_reader.pages:
+        text += page.extract_text() or ""
+
+    return text
+
+# -------------------------------
+# LOGIC FUNCTIONS
+# -------------------------------
 def detect_domain(text):
     text = text.lower()
     scores = {}
@@ -68,22 +80,25 @@ def extract_skills(text, skill_list):
 
     return list(set(found))
 
-
 # -------------------------------
-# UI
+# SESSION STORAGE
 # -------------------------------
-
-st.title("🧠 SmartHire AI – Advanced Analyzer")
-
-menu = st.sidebar.selectbox("Menu", ["Apply Job", "My Profile"])
-
 if "applications" not in st.session_state:
     st.session_state.applications = []
 
 # -------------------------------
-# APPLY
+# UI
+# -------------------------------
+st.title("🧠 SmartHire AI – Advanced Job Portal")
+
+menu = st.sidebar.selectbox("Menu", ["Apply Job", "My Profile"])
+
+# -------------------------------
+# APPLY JOB
 # -------------------------------
 if menu == "Apply Job":
+
+    st.header("Apply for Job")
 
     name = st.text_input("Name")
     email = st.text_input("Email")
@@ -91,84 +106,104 @@ if menu == "Apply Job":
     job_titles = [j["title"] for j in jobs]
     selected_job = st.selectbox("Select Job", job_titles)
 
-    resume = st.text_area("Paste Resume")
+    uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
+
+    resume = ""
+
+    if uploaded_file is not None:
+        resume = extract_text_from_pdf(uploaded_file)
+        st.success("✅ Resume uploaded and processed")
 
     if st.button("Analyze & Apply"):
 
-        job = next(j for j in jobs if j["title"] == selected_job)
+        if name and email and resume:
 
-        # Detect domain
-        domain = detect_domain(job["desc"])
-        skill_list = DOMAIN_SKILLS[domain]
+            job = next(j for j in jobs if j["title"] == selected_job)
 
-        # Extract skills
-        resume_skills = extract_skills(resume, skill_list)
-        jd_skills = extract_skills(job["desc"], skill_list)
+            # Domain detection
+            domain = detect_domain(job["desc"])
+            skill_list = DOMAIN_SKILLS[domain]
 
-        # Matching
-        matched = [s for s in jd_skills if s in resume_skills]
-        missing = [s for s in jd_skills if s not in resume_skills]
+            # Skill extraction
+            resume_skills = extract_skills(resume, skill_list)
+            jd_skills = extract_skills(job["desc"], skill_list)
 
-        match = round((len(matched) / max(1, len(jd_skills))) * 100, 2)
+            matched = [s for s in jd_skills if s in resume_skills]
+            missing = [s for s in jd_skills if s not in resume_skills]
 
-        status = "✅ Selected" if match >= 70 else "❌ Rejected"
+            match = round((len(matched) / max(1, len(jd_skills))) * 100, 2)
 
-        # Reasons
-        reasons = []
-        if missing:
-            reasons.append("Missing skills: " + ", ".join(missing))
-        if match < 70:
-            reasons.append(f"Low match score: {match}%")
+            status = "✅ Selected" if match >= 70 else "❌ Rejected"
 
-        # Suggestions
-        suggestions = []
-        for skill in missing:
-            if skill in LEARNING_RESOURCES:
-                suggestions.append((skill, LEARNING_RESOURCES[skill]))
+            # Reasons
+            reasons = []
+            if missing:
+                reasons.append("Missing skills: " + ", ".join(missing))
+            if match < 70:
+                reasons.append(f"Low match score: {match}%")
 
-        # Motivation
-        if match < 50:
-            motivation = "Don't worry! Improve skills and try again 🚀"
-        elif match < 70:
-            motivation = "Good progress! You are close 💪"
+            # Suggestions
+            suggestions = []
+            for skill in missing:
+                if skill in LEARNING_RESOURCES:
+                    suggestions.append((skill, LEARNING_RESOURCES[skill]))
+
+            # Motivation
+            if match < 50:
+                motivation = "Don't worry! Improve your skills and try again 🚀"
+            elif match < 70:
+                motivation = "Good progress! You are close 💪"
+            else:
+                motivation = "Excellent! You are job ready 🚀"
+
+            # Store
+            result = {
+                "email": email,
+                "job": selected_job,
+                "match": match,
+                "status": status
+            }
+
+            st.session_state.applications.append(result)
+
+            # OUTPUT
+            st.subheader("📊 Result")
+            st.write("Domain:", domain.upper())
+            st.write("Match:", match, "%")
+            st.write("Status:", status)
+
+            st.subheader("❌ Reasons")
+            for r in reasons:
+                st.write("-", r)
+
+            st.subheader("📚 Learning Resources")
+            for s in suggestions:
+                st.markdown(f"🔹 {s[0]} → [Learn Here]({s[1]})")
+
+            st.subheader("💡 Message")
+            st.write(motivation)
+
         else:
-            motivation = "Excellent! You are job ready 🚀"
-
-        # Store
-        result = {
-            "email": email,
-            "job": selected_job,
-            "match": match,
-            "status": status
-        }
-        st.session_state.applications.append(result)
-
-        # OUTPUT
-        st.subheader("📊 Result")
-        st.write("Domain:", domain.upper())
-        st.write("Match:", match, "%")
-        st.write("Status:", status)
-
-        st.subheader("❌ Reasons")
-        for r in reasons:
-            st.write("-", r)
-
-        st.subheader("📚 Learning")
-        for s in suggestions:
-            st.markdown(f"🔹 {s[0]} → [Learn Here]({s[1]})")
-
-        st.subheader("💡 Message")
-        st.write(motivation)
+            st.warning("Please fill all fields and upload resume")
 
 # -------------------------------
 # PROFILE
 # -------------------------------
 elif menu == "My Profile":
 
-    email = st.text_input("Enter email")
+    st.header("My Applications")
 
-    if st.button("View"):
+    email = st.text_input("Enter your email")
+
+    if st.button("View Applications"):
+
         user_apps = [a for a in st.session_state.applications if a["email"] == email]
 
-        for app in user_apps:
-            st.write(app)
+        if user_apps:
+            for app in user_apps:
+                st.subheader(app["job"])
+                st.write("Match:", app["match"])
+                st.write("Status:", app["status"])
+                st.write("---")
+        else:
+            st.warning("No applications found")
