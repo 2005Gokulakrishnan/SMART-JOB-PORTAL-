@@ -1,95 +1,82 @@
-from flask import Flask, request, jsonify
+import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-app = Flask(__name__)
+st.set_page_config(page_title="SmartHire AI", layout="wide")
 
-# Temporary storage (acts like DB for now)
+if "applications" not in st.session_state:
+    st.session_state.applications = []
+
 jobs = [
-    {
-        "id": 1,
-        "title": "Python Developer",
-        "description": "Looking for Python, Flask, SQL, and Machine Learning skills"
-    },
-    {
-        "id": 2,
-        "title": "Frontend Developer",
-        "description": "Looking for HTML, CSS, JavaScript, React"
-    }
+    {"id": 1, "title": "Python Developer", "desc": "Python Flask SQL Machine Learning"},
+    {"id": 2, "title": "Frontend Developer", "desc": "HTML CSS JavaScript React"},
 ]
 
-applications = []
+st.title("🧠 SmartHire AI – Job Portal")
 
+menu = st.sidebar.selectbox("Menu", ["Apply Job", "My Profile"])
 
-@app.route("/")
-def home():
-    return "SmartHire AI Backend Running 🚀"
+if menu == "Apply Job":
+    st.header("Apply for Job")
 
+    name = st.text_input("Name")
+    email = st.text_input("Email")
 
-# 📌 Get all jobs
-@app.route("/jobs", methods=["GET"])
-def get_jobs():
-    return jsonify(jobs)
+    job_titles = [job["title"] for job in jobs]
+    selected_job = st.selectbox("Select Job", job_titles)
 
+    resume = st.text_area("Paste Resume")
 
-# 📌 Apply for job (CORE FEATURE)
-@app.route("/apply", methods=["POST"])
-def apply():
-    data = request.json
+    if st.button("Apply"):
+        if name and email and resume:
+            job = next(j for j in jobs if j["title"] == selected_job)
 
-    name = data.get("name")
-    email = data.get("email")
-    resume = data.get("resume")
-    job_id = data.get("job_id")
+            vectorizer = TfidfVectorizer()
+            vectors = vectorizer.fit_transform([resume, job["desc"]])
+            score = cosine_similarity(vectors[0], vectors[1])[0][0]
+            match = round(score * 100, 2)
 
-    if not all([name, email, resume, job_id]):
-        return jsonify({"error": "Missing fields"}), 400
+            resume_words = set(resume.lower().split())
+            jd_words = set(job["desc"].lower().split())
+            missing = list(jd_words - resume_words)
 
-    # find job
-    job = next((j for j in jobs if j["id"] == job_id), None)
-    if not job:
-        return jsonify({"error": "Job not found"}), 404
+            status = "✅ Selected" if match >= 70 else "❌ Rejected"
 
-    jd = job["description"]
+            result = {
+                "name": name,
+                "email": email,
+                "job": selected_job,
+                "match": match,
+                "status": status,
+                "missing": missing[:5]
+            }
 
-    # 🔥 AI Matching
-    vectorizer = TfidfVectorizer()
-    vectors = vectorizer.fit_transform([resume, jd])
-    similarity = cosine_similarity(vectors[0], vectors[1])[0][0]
-    match = round(similarity * 100, 2)
+            st.session_state.applications.append(result)
 
-    # missing skills
-    resume_words = set(resume.lower().split())
-    jd_words = set(jd.lower().split())
-    missing = list(jd_words - resume_words)
+            st.success("Application Submitted!")
 
-    status = "Selected" if match >= 70 else "Rejected"
+            st.subheader("Result")
+            st.write(f"Match: {match}%")
+            st.write(f"Status: {status}")
+            st.write("Missing Skills:", missing[:5])
 
-    # store result
-    application = {
-        "name": name,
-        "email": email,
-        "job_id": job_id,
-        "job_title": job["title"],
-        "match": match,
-        "status": status,
-        "missing_skills": missing[:10]
-    }
+        else:
+            st.warning("Fill all fields")
 
-    applications.append(application)
+elif menu == "My Profile":
+    st.header("My Applications")
 
-    return jsonify(application)
+    email = st.text_input("Enter your email")
 
+    if st.button("View Applications"):
+        results = [a for a in st.session_state.applications if a["email"] == email]
 
-# 📌 Profile page (view applications)
-@app.route("/my-applications", methods=["GET"])
-def my_applications():
-    email = request.args.get("email")
-
-    user_apps = [a for a in applications if a["email"] == email]
-
-    return jsonify(user_apps)
-
-
-if __name__ == "__main__":
-    app.run()
+        if results:
+            for r in results:
+                st.subheader(r["job"])
+                st.write(f"Match: {r['match']}%")
+                st.write(f"Status: {r['status']}")
+                st.write("Missing:", r["missing"])
+                st.write("---")
+        else:
+            st.warning("No applications found")
