@@ -4,143 +4,113 @@ import PyPDF2
 st.set_page_config(page_title="SmartHire AI", layout="wide")
 
 # -------------------------------
-# DOMAIN SKILLS
+# BIG SKILL DATABASE
 # -------------------------------
-DOMAIN_SKILLS = {
-    "software": ["python","java","react","node","django","flask","sql","mongodb","aws","docker","html","css","javascript"],
-    "ai": ["machine learning","deep learning","nlp","tensorflow","pytorch"],
-    "ece": ["embedded","microcontroller","vlsi","pcb","arduino"],
-}
+SKILLS = [
+    "python","java","react","node","django","flask","sql","mongodb","aws","docker",
+    "html","css","javascript","machine learning","deep learning","nlp","tensorflow",
+    "pytorch","git","linux","kubernetes","c++","data analysis"
+]
 
 # -------------------------------
-# SYNONYMS
-# -------------------------------
-SYNONYMS = {
-    "react": ["reactjs","react.js"],
-    "node": ["nodejs","node.js"],
-    "machine learning": ["ml"],
-    "deep learning": ["neural network"]
-}
-
-# -------------------------------
-# LEARNING RESOURCES
+# LEARNING RESOURCES (STRONG)
 # -------------------------------
 LEARNING_RESOURCES = {
-    "python": "https://www.youtube.com/watch?v=_uQrJ0TkZlc",
-    "react": "https://www.youtube.com/watch?v=bMknfKXIFA8",
-    "docker": "https://www.youtube.com/watch?v=3c-iBn73dDE",
-    "aws": "https://www.youtube.com/watch?v=ulprqHHWlng",
-    "machine learning": "https://www.youtube.com/watch?v=GwIo3gDZCVQ"
+    "python": "https://youtu.be/_uQrJ0TkZlc",
+    "react": "https://youtu.be/bMknfKXIFA8",
+    "docker": "https://youtu.be/3c-iBn73dDE",
+    "aws": "https://youtu.be/ulprqHHWlng",
+    "machine learning": "https://youtu.be/GwIo3gDZCVQ",
+    "javascript": "https://youtu.be/PkZNo7MFNFg",
+    "sql": "https://youtu.be/HXV3zeQKqGY"
 }
 
 # -------------------------------
-# JOBS
+# REALISTIC JOBS
 # -------------------------------
 jobs = [
-    {"title": "Python Developer", "desc": "python flask sql machine learning"},
+    {"title": "Python Backend Developer", "desc": "python flask sql docker aws"},
     {"title": "Frontend Developer", "desc": "html css javascript react"},
+    {"title": "Full Stack Developer", "desc": "python react sql docker"},
+    {"title": "Machine Learning Engineer", "desc": "python machine learning tensorflow"},
+    {"title": "DevOps Engineer", "desc": "docker aws kubernetes linux"}
 ]
 
 # -------------------------------
 # PDF FUNCTION
 # -------------------------------
-def extract_text_from_pdf(uploaded_file):
+def extract_text_from_pdf(file):
     text = ""
-    pdf_reader = PyPDF2.PdfReader(uploaded_file)
-
-    for page in pdf_reader.pages:
+    reader = PyPDF2.PdfReader(file)
+    for page in reader.pages:
         text += page.extract_text() or ""
-
-    return text
-
-# -------------------------------
-# LOGIC FUNCTIONS
-# -------------------------------
-def detect_domain(text):
-    text = text.lower()
-    scores = {}
-
-    for domain, skills in DOMAIN_SKILLS.items():
-        scores[domain] = sum(1 for s in skills if s in text)
-
-    return max(scores, key=scores.get)
-
-
-def extract_skills(text, skill_list):
-    text = text.lower()
-    found = []
-
-    for skill in skill_list:
-        if skill in text:
-            found.append(skill)
-        elif skill in SYNONYMS:
-            for syn in SYNONYMS[skill]:
-                if syn in text:
-                    found.append(skill)
-
-    return list(set(found))
+    return text.lower()
 
 # -------------------------------
-# SESSION STORAGE
+# SESSION
 # -------------------------------
 if "applications" not in st.session_state:
     st.session_state.applications = []
 
 # -------------------------------
-# UI
+# UI HEADER
 # -------------------------------
-st.title("🧠 SmartHire AI – Advanced Job Portal")
+st.title("🧠 SmartHire AI")
+st.caption("AI-powered Job Matching with Feedback & Growth Suggestions")
 
 menu = st.sidebar.selectbox("Menu", ["Apply Job", "My Profile"])
 
 # -------------------------------
-# APPLY JOB
+# APPLY PAGE
 # -------------------------------
 if menu == "Apply Job":
 
-    st.header("Apply for Job")
+    st.subheader("🚀 Apply for Jobs")
 
-    name = st.text_input("Name")
-    email = st.text_input("Email")
+    col1, col2 = st.columns(2)
 
-    job_titles = [j["title"] for j in jobs]
-    selected_job = st.selectbox("Select Job", job_titles)
+    with col1:
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+
+    with col2:
+        job_titles = [j["title"] for j in jobs]
+        selected_job = st.selectbox("Select Job Role", job_titles)
 
     uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
 
     resume = ""
-
-    if uploaded_file is not None:
+    if uploaded_file:
         resume = extract_text_from_pdf(uploaded_file)
-        st.success("✅ Resume uploaded and processed")
+        st.success("Resume processed successfully ✅")
 
-    if st.button("Analyze & Apply"):
+    if st.button("Analyze Application"):
 
-        if name and email and resume:
-
+        if not (name and email and resume):
+            st.warning("Please complete all fields")
+        else:
             job = next(j for j in jobs if j["title"] == selected_job)
-
-            # Domain detection
-            domain = detect_domain(job["desc"])
-            skill_list = DOMAIN_SKILLS[domain]
+            jd = job["desc"]
 
             # Skill extraction
-            resume_skills = extract_skills(resume, skill_list)
-            jd_skills = extract_skills(job["desc"], skill_list)
+            resume_skills = [s for s in SKILLS if s in resume]
+            jd_skills = [s for s in SKILLS if s in jd]
 
             matched = [s for s in jd_skills if s in resume_skills]
             missing = [s for s in jd_skills if s not in resume_skills]
 
             match = round((len(matched) / max(1, len(jd_skills))) * 100, 2)
-
             status = "✅ Selected" if match >= 70 else "❌ Rejected"
 
-            # Reasons
-            reasons = []
-            if missing:
-                reasons.append("Missing skills: " + ", ".join(missing))
-            if match < 70:
-                reasons.append(f"Low match score: {match}%")
+            # -------------------------------
+            # BETTER MESSAGES
+            # -------------------------------
+            if match < 50:
+                message = "You're not far away! Focus on key missing skills and try again. Growth takes time 🚀"
+            elif match < 70:
+                message = "Good progress! You're close to being job-ready. Improve a few areas 💪"
+            else:
+                message = "Excellent! You are a strong match. Keep pushing forward 🚀"
 
             # Suggestions
             suggestions = []
@@ -148,62 +118,58 @@ if menu == "Apply Job":
                 if skill in LEARNING_RESOURCES:
                     suggestions.append((skill, LEARNING_RESOURCES[skill]))
 
-            # Motivation
-            if match < 50:
-                motivation = "Don't worry! Improve your skills and try again 🚀"
-            elif match < 70:
-                motivation = "Good progress! You are close 💪"
-            else:
-                motivation = "Excellent! You are job ready 🚀"
-
-            # Store
-            result = {
+            # Save
+            st.session_state.applications.append({
                 "email": email,
                 "job": selected_job,
                 "match": match,
                 "status": status
-            }
+            })
 
-            st.session_state.applications.append(result)
+            # -------------------------------
+            # OUTPUT UI (CARD STYLE)
+            # -------------------------------
+            st.markdown("---")
+            st.subheader("📊 Analysis Result")
 
-            # OUTPUT
-            st.subheader("📊 Result")
-            st.write("Domain:", domain.upper())
-            st.write("Match:", match, "%")
-            st.write("Status:", status)
+            col1, col2, col3 = st.columns(3)
 
-            st.subheader("❌ Reasons")
-            for r in reasons:
-                st.write("-", r)
+            col1.metric("Match %", match)
+            col2.metric("Status", status)
+            col3.metric("Missing Skills", len(missing))
 
-            st.subheader("📚 Learning Resources")
-            for s in suggestions:
-                st.markdown(f"🔹 {s[0]} → [Learn Here]({s[1]})")
+            st.markdown("### ❌ Skill Gap")
+            st.write(", ".join(missing) if missing else "No gaps 🎉")
 
-            st.subheader("💡 Message")
-            st.write(motivation)
+            st.markdown("### 📚 Learning Suggestions")
+            if suggestions:
+                for s in suggestions:
+                    st.markdown(f"🔹 {s[0]} → [Learn Here]({s[1]})")
+            else:
+                st.write("You're already strong in required skills!")
 
-        else:
-            st.warning("Please fill all fields and upload resume")
+            st.markdown("### 💡 Message for You")
+            st.success(message)
 
 # -------------------------------
 # PROFILE
 # -------------------------------
 elif menu == "My Profile":
 
-    st.header("My Applications")
+    st.subheader("📂 My Applications")
 
     email = st.text_input("Enter your email")
 
-    if st.button("View Applications"):
+    if st.button("View"):
+        data = [a for a in st.session_state.applications if a["email"] == email]
 
-        user_apps = [a for a in st.session_state.applications if a["email"] == email]
-
-        if user_apps:
-            for app in user_apps:
-                st.subheader(app["job"])
-                st.write("Match:", app["match"])
-                st.write("Status:", app["status"])
-                st.write("---")
+        if data:
+            for d in data:
+                st.markdown(f"""
+                **Job:** {d['job']}  
+                **Match:** {d['match']}%  
+                **Status:** {d['status']}  
+                ---
+                """)
         else:
             st.warning("No applications found")
